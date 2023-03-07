@@ -2403,21 +2403,21 @@ class AxiMemoryModel(AxiSlave):
 
     def _make_fsm(self, write_delay=10, read_delay=10, sleep_interval=16, keep_sleep=4):
         write_count = self.m.Reg(
-            '_'.join(['', 'write_count']), self.addrwidth + 1, initval=0)
+            '_'.join(['', self.name, 'write_count']), self.addrwidth + 1, initval=0)
         write_addr = self.m.Reg(
-            '_'.join(['', 'write_addr']), self.addrwidth, initval=0)
+            '_'.join(['', self.name, 'write_addr']), self.addrwidth, initval=0)
         read_count = self.m.Reg(
-            '_'.join(['', 'read_count']), self.addrwidth + 1, initval=0)
+            '_'.join(['', self.name, 'read_count']), self.addrwidth + 1, initval=0)
         read_addr = self.m.Reg(
-            '_'.join(['', 'read_addr']), self.addrwidth, initval=0)
+            '_'.join(['', self.name, 'read_addr']), self.addrwidth, initval=0)
 
         if sleep_interval > 0:
             sleep_interval_count = self.m.Reg(
-                '_'.join(['', 'sleep_interval_count']), self.addrwidth + 1, initval=0)
+                '_'.join(['', self.name, 'sleep_interval_count']), self.addrwidth + 1, initval=0)
 
             if keep_sleep > 0:
                 keep_sleep_count = self.m.Reg(
-                    '_'.join(['', 'keep_sleep_count']), self.addrwidth + 1, initval=0)
+                    '_'.join(['', self.name, 'keep_sleep_count']), self.addrwidth + 1, initval=0)
 
                 self.seq.If(sleep_interval_count == sleep_interval - 1)(
                     keep_sleep_count.inc()
@@ -2943,21 +2943,21 @@ class AxiMultiportMemoryModel(AxiMemoryModel):
                     self.waddrs, self.wdatas, self.wresps, self.raddrs, self.rdatas)):
 
             write_count = self.m.Reg(
-                '_'.join(['', 'write_count_%d' % i]), self.addrwidth + 1, initval=0)
+                '_'.join(['', self.name, 'write_count_%d' % i]), self.addrwidth + 1, initval=0)
             write_addr = self.m.Reg(
-                '_'.join(['', 'write_addr_%d' % i]), self.addrwidth, initval=0)
+                '_'.join(['', self.name, 'write_addr_%d' % i]), self.addrwidth, initval=0)
             read_count = self.m.Reg(
-                '_'.join(['', 'read_count_%d' % i]), self.addrwidth + 1, initval=0)
+                '_'.join(['', self.name, 'read_count_%d' % i]), self.addrwidth + 1, initval=0)
             read_addr = self.m.Reg(
-                '_'.join(['', 'read_addr_%d' % i]), self.addrwidth, initval=0)
+                '_'.join(['', self.name, 'read_addr_%d' % i]), self.addrwidth, initval=0)
 
             if sleep_interval > 0:
                 sleep_interval_count = self.m.Reg(
-                    '_'.join(['', 'sleep_interval_count_%d' % i]), self.addrwidth + 1, initval=0)
+                    '_'.join(['', self.name, 'sleep_interval_count_%d' % i]), self.addrwidth + 1, initval=0)
 
                 if keep_sleep > 0:
                     keep_sleep_count = self.m.Reg(
-                        '_'.join(['', 'keep_sleep_count_%d' % i]), self.addrwidth + 1, initval=0)
+                        '_'.join(['', self.name, 'keep_sleep_count_%d' % i]), self.addrwidth + 1, initval=0)
 
                     self.seq.If(sleep_interval_count == sleep_interval - 1)(
                         keep_sleep_count.inc()
@@ -3439,21 +3439,21 @@ class AxiSerialMemoryModel(AxiSlave):
         self.fsm.If(self.raddr.arvalid).goto(read_mode)
 
         write_count = self.m.Reg(
-            '_'.join(['', 'write_count']), self.addrwidth + 1, initval=0)
+            '_'.join(['', self.name, 'write_count']), self.addrwidth + 1, initval=0)
         write_addr = self.m.Reg(
-            '_'.join(['', 'write_addr']), self.addrwidth, initval=0)
+            '_'.join(['', self.name, 'write_addr']), self.addrwidth, initval=0)
         read_count = self.m.Reg(
-            '_'.join(['', 'read_count']), self.addrwidth + 1, initval=0)
+            '_'.join(['', self.name, 'read_count']), self.addrwidth + 1, initval=0)
         read_addr = self.m.Reg(
-            '_'.join(['', 'read_addr']), self.addrwidth, initval=0)
+            '_'.join(['', self.name, 'read_addr']), self.addrwidth, initval=0)
 
         if sleep_interval > 0:
             sleep_interval_count = self.m.Reg(
-                '_'.join(['', 'sleep_interval_count']), self.addrwidth + 1, initval=0)
+                '_'.join(['', self.name, 'sleep_interval_count']), self.addrwidth + 1, initval=0)
 
             if keep_sleep > 0:
                 keep_sleep_count = self.m.Reg(
-                    '_'.join(['', 'keep_sleep_count']), self.addrwidth + 1, initval=0)
+                    '_'.join(['', self.name, 'keep_sleep_count']), self.addrwidth + 1, initval=0)
 
                 self.seq.If(sleep_interval_count == sleep_interval - 1)(
                     keep_sleep_count.inc()
@@ -3814,21 +3814,21 @@ class AxiSerialMultiportMemoryModel(AxiSerialMemoryModel):
                 zip(self.fsms, self.waddrs, self.wdatas, self.wresps, self.raddrs, self.rdatas)):
 
             write_count = self.m.Reg(
-                '_'.join(['', 'write_count_%d' % i]), self.addrwidth + 1, initval=0)
+                '_'.join(['', self.name, 'write_count_%d' % i]), self.addrwidth + 1, initval=0)
             write_addr = self.m.Reg(
-                '_'.join(['', 'write_addr_%d' % i]), self.addrwidth, initval=0)
+                '_'.join(['', self.name, 'write_addr_%d' % i]), self.addrwidth, initval=0)
             read_count = self.m.Reg(
-                '_'.join(['', 'read_count_%d' % i]), self.addrwidth + 1, initval=0)
+                '_'.join(['', self.name, 'read_count_%d' % i]), self.addrwidth + 1, initval=0)
             read_addr = self.m.Reg(
-                '_'.join(['', 'read_addr_%d' % i]), self.addrwidth, initval=0)
+                '_'.join(['', self.name, 'read_addr_%d' % i]), self.addrwidth, initval=0)
 
             if sleep_interval > 0:
                 sleep_interval_count = self.m.Reg(
-                    '_'.join(['', 'sleep_interval_count_%d' % i]), self.addrwidth + 1, initval=0)
+                    '_'.join(['', self.name, 'sleep_interval_count_%d' % i]), self.addrwidth + 1, initval=0)
 
                 if keep_sleep > 0:
                     keep_sleep_count = self.m.Reg(
-                        '_'.join(['', 'keep_sleep_count_%d' % i]), self.addrwidth + 1, initval=0)
+                        '_'.join(['', self.name, 'keep_sleep_count_%d' % i]), self.addrwidth + 1, initval=0)
 
                     fsm.seq.If(sleep_interval_count == sleep_interval - 1)(
                         keep_sleep_count.inc()

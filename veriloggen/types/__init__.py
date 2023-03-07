@@ -1,8 +1,7 @@
-from __future__ import absolute_import
-from __future__ import print_function
-
 from .fixed import reset as fixed_reset
+from .pump import reset as pump_reset
 
 
 def reset():
     fixed_reset()
+    pump_reset()

@@ -15,6 +15,8 @@ from .scope import ScopeName, ScopeFrameList, ScopeFrame
 from .operator import getVeriloggenOp, getMethodName, applyMethod
 from .fixed import FixedConst
 
+from veriloggen.types.mul import Multiplier
+
 numerical_types = vtypes.numerical_types
 
 _tmp_count = 0
@@ -210,6 +212,119 @@ class CompileVisitor(ast.NodeVisitor):
         self.setBind(left, rslt)
         self.setFsm()
         self.incFsmCount()
+
+    def visit_AnnAssign(self, node):
+        if self.skip():
+            return
+
+        if not hasattr(node, 'value') or node.value is None:
+            raise ValueError('the right-hand side is mandatory')
+        if not node.simple:
+            raise ValueError('only pure names are supported')
+        if not isinstance(node.target, ast.Name):
+            raise ValueError('the left-hand side must be a simple identifier')
+        if not isinstance(node.annotation, ast.Constant):
+            raise ValueError('the annotation must be a constant')
+
+        if isinstance(node.annotation.value, int):
+            width = node.annotation.value
+            if width <= 0:
+                raise ValueError('the data width must be positive')
+            right = self.visit(node.value)
+            left_name = node.target.id
+            left = self.getVariable(left_name, width=width, store=True)
+            if (isinstance(left, fxd._FixedBase) or
+                isinstance(right, fxd._FixedBase)):
+                raise ValueError('fixed-point data types are not supported')
+            self.setBind(left, right)
+            self.setFsm()
+            self.incFsmCount()
+        elif isinstance(node.annotation.value, str):
+            if node.annotation.value != 'multicycle':
+                raise ValueError('Only the multicycle specification '
+                                 'is supported for a string annotation')
+            right = self._multicycle_arithmetic(node.value)
+            left_name = node.target.id
+            left = self.getVariable(left_name, store=True)
+            if isinstance(left, fxd._FixedBase):
+                raise ValueError('fixed-point data types are not supported '
+                                 'in the multicycle mode')
+            self.setBind(left, right)
+            self.fsm.goto_next()
+        else:
+            raise ValueError(
+                'an annotation must be a constant of type int or str')
+
+    def _multicycle_arithmetic(self, node):
+        tmp_prefix = '_'.join([self.name, 'multicycle', 'tmp'])
+        mul_prefix = '_'.join([self.name, 'multicycle', 'mul'])
+        if isinstance(node, ast.Constant):
+            if isinstance(node.value, int):
+                tmp = self.m.Wire(
+                    _tmp_name(tmp_prefix), self.datawidth, signed=True)
+                tmp.assign(node.value)
+                return tmp
+            else:
+                raise ValueError(
+                    'unsupported constant type in the multicycle mode: '
+                    f'{type(node.value)}')
+        elif isinstance(node, ast.Name):
+            var = self.getVariable(node.id)
+            if isinstance(var, int):
+                tmp = self.m.Wire(
+                    _tmp_name(tmp_prefix), self.datawidth, signed=True)
+                tmp.assign(var)
+                return tmp
+            elif isinstance(var, (vtypes.Reg, vtypes.Wire)):
+                return var
+            else:
+                raise RuntimeError
+        elif isinstance(node, ast.UnaryOp):
+            right = self._multicycle_arithmetic(node.operand)
+            if isinstance(node.op, (ast.UAdd, ast.USub, ast.Invert)):
+                op = getVeriloggenOp(node.op)
+                rslt = self.m.Wire(
+                    _tmp_name(tmp_prefix), self.datawidth, signed=True)
+                rslt.assign(op(right))
+                return rslt
+            else:
+                raise ValueError(
+                    'unsupported operation type in the multicycle mode: '
+                    f'{type(node.op)}')
+        elif isinstance(node, ast.BinOp):
+            left = self._multicycle_arithmetic(node.left)
+            right = self._multicycle_arithmetic(node.right)
+            if isinstance(node.op,
+                          (ast.Add, ast.Sub, ast.LShift, ast.RShift,
+                           ast.BitOr, ast.BitXor, ast.BitAnd)):
+                op = getVeriloggenOp(node.op)
+                rslt = self.m.Reg(
+                    _tmp_name(tmp_prefix), self.datawidth, signed=True)
+                self.fsm(
+                    rslt(op(left, right))
+                )
+                self.fsm.goto_next()
+                return rslt
+            elif isinstance(node.op, ast.Mult):
+                en = self.m.Wire(_tmp_name(tmp_prefix), signed=False)
+                en.assign(self.fsm.here)
+                self.fsm.goto_next()
+                mul = Multiplier(self.m, _tmp_name(mul_prefix),
+                                 self.clk, self.rst, left, right, en)
+                rslt = self.m.Reg(
+                    _tmp_name(tmp_prefix), self.datawidth, signed=True)
+                self.fsm.If(mul.valid)(
+                    rslt(mul.value)
+                )
+                self.fsm.If(mul.valid).goto_next()
+                return rslt
+            else:
+                raise ValueError(
+                    'unsupported operation type in the multicycle mode: '
+                    f'{type(node.op)}')
+        else:
+            raise ValueError('unsupported node type in the multicycle mode: '
+                             f'{type(node)}')
 
     def visit_IfExp(self, node):
         test = self.visit(node.test)  # if condition
@@ -1077,11 +1192,13 @@ class CompileVisitor(ast.NodeVisitor):
         val = self.hasBreak() or self.hasContinue() or self.hasReturn()
         return val
 
-    def makeVariable(self, name, _type=None):
+    def makeVariable(self, name, width=None, _type=None):
         if _type is None:
-            return self.makeVariableReg(name)
+            return self.makeVariableReg(name, width=width)
 
         if _type['type'] == 'fixed':
+            if width is not None:
+                raise ValueError('conflicting specification of width')
             width = _type['width']
             point = _type['point']
             signed = _type['signed']
@@ -1101,7 +1218,7 @@ class CompileVisitor(ast.NodeVisitor):
             width = self.datawidth
         return fxd.FixedReg(self.m, signame, width=width, point=point, signed=signed)
 
-    def getVariable(self, name, store=False, _type=None):
+    def getVariable(self, name, width=None, store=False, _type=None):
         if isinstance(name, vtypes._Numeric):
             return name
 
@@ -1115,14 +1232,14 @@ class CompileVisitor(ast.NodeVisitor):
                 if glb is not None:
                     return glb
                 raise NameError("name '%s' is not defined" % name)
-            var = self.makeVariable(name, _type=_type)
+            var = self.makeVariable(name, width=width, _type=_type)
             self.scope.addVariable(name, var)
             var = self.scope.searchVariable(name)
         return var
 
-    def getTmpVariable(self, _type=None):
+    def getTmpVariable(self, width=None, _type=None):
         name = _tmp_name('tmp')
-        var = self.getVariable(name, store=True, _type=_type)
+        var = self.getVariable(name, width=width, store=True, _type=_type)
         return var
 
     def getGlobalObject(self, name):
